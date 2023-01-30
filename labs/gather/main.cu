@@ -1,7 +1,16 @@
 #include "helper.hpp"
 
 __global__ void s2g_gpu_gather_kernel(uint32_t *in, uint32_t *out, int len) {
-  //@@ INSERT KERNEL CODE HERE
+  uint32_t n = blockIdx.x * blockDim.x + threadIdx.x;
+  if (n >= len) {
+    return;
+  }
+  int out_reg = 0;
+  for (int inIdx = 0; inIdx < len; ++inIdx) {
+    int intermediate = outInvariant(in[inIdx]);
+    out_reg += outDependent(intermediate, inIdx, n);
+  }
+  out[n] += out_reg;
 }
 
 
@@ -19,6 +28,9 @@ static void s2g_cpu_gather(uint32_t *in, uint32_t *out, int len) {
 
 static void s2g_gpu_gather(uint32_t *in, uint32_t *out, int len) {
   //@@ INSERT CODE HERE
+  uint32_t num_per_thread = 64;
+  uint32_t blocks         = (len / num_per_thread) + 1;
+  s2g_gpu_gather_kernel<<<blocks, num_per_thread>>>(in, out, len);
 }
 
 
