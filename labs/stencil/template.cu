@@ -6,16 +6,34 @@
 #define TILE_SIZE 30
 
 __global__ void kernel(int *A0, int *Anext, int nx, int ny, int nz) {
+#define A0(x, y, z) A0[(z)*(nx*ny) + (y)*nx + (x)]
+#define Anext(x, y, z) Anext[(z) * (nx * ny) + (y) * nx + (x)]
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+  int previous = A0(i, j, 0);
+  int current  = A0(i, j, 1);
+  int next     = A0(i, j, 2);
+  for (int k = 1; k < nz - 1; k++) {
+    if (i > 0 && i < (nx - 1) && j > 0 && j < (ny - 1)) {
+      Anext(i, j, k) = previous+next + A0(i + 1, j, k) + A0(i - 1, j, k) + A0(i, j - 1, k) + A0(i, j + 1, k) -6 * current;
+    }
+    previous = current;
+    current  = next;
+    if (k < nz - 2)
+      next     = A0(i, j, k + 2);
+  }
 
   // INSERT KERNEL CODE HERE
-  
-
+  #undef A0
+  #undef Anext
 }
 
 void launchStencil(int* A0, int* Anext, int nx, int ny, int nz) {
 
+  dim3 thread_per_block(TILE_SIZE , TILE_SIZE);
+  dim3 num_blocks(ceil(static_cast<float>(nx) / thread_per_block.x), ceil(static_cast<float> (ny) / thread_per_block.y));
+  kernel<<<num_blocks, thread_per_block>>>(A0, Anext, nx, ny, nz);
   // INSERT CODE HERE
-
 }
 
 
