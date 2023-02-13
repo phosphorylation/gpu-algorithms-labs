@@ -38,7 +38,7 @@ static uint_fast32_t rng_uint32(uint_fast32_t *rng_state) {
 }
 
 static uint_fast32_t *rng_new_state(uint_fast32_t seed) {
-  uint64_t *rng_state = new uint64_t;
+  uint_fast32_t *rng_state = new uint_fast32_t;
   *rng_state          = seed;
   return rng_state;
 }
@@ -83,13 +83,13 @@ static bool verify(const int *Anext, const int *A0, const int nx, const int ny, 
     for (size_t z = 1; z < nz-1; ++z) {
       for (size_t y = 1; y < ny-1; ++y) {
         for (size_t x = 1; x < nx-1; ++x) {
-          const int expected = _A0(x,     y,     z + 1) +
-                               _A0(x,     y,     z - 1) +
+          const int expected =  _A0(x,     y,     z + 1) +
+              _A0(x, y, z - 1)+
                                _A0(x,     y + 1, z    ) +
                                _A0(x,     y - 1, z    ) +
                                _A0(x + 1, y,     z    ) +
                                _A0(x - 1, y,     z    ) -
-                           6 * _A0(x,     y,     z    );
+                           6*_A0(x,     y,     z    );
           INFO("the results did not match at [" << x << "," << y << "," << z << "]");
           REQUIRE(expected == _Anext(x, y, z));
         }    

@@ -6875,7 +6875,7 @@ namespace {
 
 #elif defined(CATCH_CONFIG_COLOUR_ANSI) //////////////////////////////////////
 
-#include <unistd.h>
+#include "unistd.h"
 
 namespace Catch {
 namespace {

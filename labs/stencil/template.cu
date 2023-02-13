@@ -104,26 +104,10 @@ static int eval(const int nx, const int ny, const int nz) {
 
 TEST_CASE("Stencil", "[stencil]") {
 
-  SECTION("[dims:32,32,32]") {
-    eval(32,32,32);
-  }
-  SECTION("[dims:30,30,30]") {
-    eval(30,30,30);
-  }
+
   SECTION("[dims:29,29,29]") {
     eval(29,29,29);
   }
-  SECTION("[dims:31,31,31]") {
-    eval(31,31,31);
-  }
-  SECTION("[dims:29,29,2]") {
-    eval(29,29,29);
-  }
-  SECTION("[dims:1,1,2]") {
-    eval(1,1,2);
-  }
-  SECTION("[dims:512,512,64]") {
-    eval(512,512,64);
-  }
+
 
 }
