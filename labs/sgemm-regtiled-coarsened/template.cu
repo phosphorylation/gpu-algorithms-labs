@@ -42,8 +42,8 @@ __global__ void mysgemm(int m, int n, int k, const float *A, const float *B, flo
   __shared__ float N[TILE_SZ_A][TILE_SZ_B];
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y * TILE_SZ_B;
-  float temp_results[TILE_SZ_B];
-  float temp_A[S];
+  float temp_results[TILE_SZ_B]={};
+  float temp_A[S]={};
 
   for(int current_offset = 0;current_offset<k;current_offset+=S) {
     for (int load = 0; load < TILE_SZ_B; load++) {
@@ -51,16 +51,12 @@ __global__ void mysgemm(int m, int n, int k, const float *A, const float *B, flo
         N[threadIdx.x][load] = B(current_offset + threadIdx.x, y + load);
       }
     }
-    __syncthreads();
-    for (int i = 0; i < S; i++) {
-      if (x < m && current_offset + i < k) {
-        temp_A[i] = A(x, current_offset + i);
-      }
-    }
-    for (int i = 0; i < TILE_SZ_B; i++) {
-      for (int bar = 0; bar < S; bar++) {
-        if (x < m && current_offset + bar < k && y + i < n && current_offset + threadIdx.x < k) {
-          temp_results[i] += temp_A[bar] * N[bar][i];
+    __syncthreads(); 
+    for (int bar = 0; bar < S; bar++) {
+      float temp_A = A(x, current_offset +bar);
+      for (int i = 0; i < TILE_SZ_B; i++) {
+        if (x < m && current_offset + bar < k) {
+          temp_results[i] += temp_A * N[bar][i];
         }
       }
     }
