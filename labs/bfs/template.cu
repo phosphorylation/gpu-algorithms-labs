@@ -13,10 +13,23 @@
 #define NUM_WARP_QUEUES 8
 // Maximum number of elements that can be inserted into a warp queue
 #define WQ_CAPACITY (BQ_CAPACITY / NUM_WARP_QUEUES)
-
+typedef unsigned int uint;
 /******************************************************************************
  GPU kernels
 *******************************************************************************/
+//__device__ void mutex_lock(unsigned int *mutex) {
+//    unsigned int ns = 8;
+//    while (atomicCAS(mutex, 0, 1) == 1) {
+//        __nanosleep(ns);
+//        if (ns < 256) {
+//            ns *= 2;
+//        }
+//    }
+//}
+//
+//__device__ void mutex_unlock(unsigned int *mutex) {
+//    atomicExch(mutex, 0);
+//}
 
 __global__ void gpu_global_queueing_kernel(unsigned int *nodePtrs,
                                           unsigned int *nodeNeighbors,
@@ -31,6 +44,23 @@ __global__ void gpu_global_queueing_kernel(unsigned int *nodePtrs,
   // Loop over all neighbors of the node
   // If neighbor hasn't been visited yet
   // Add neighbor to global queue
+  int x =blockDim.x*blockIdx.x+threadIdx.x;
+  for(int start = 0;start<*numCurrLevelNodes;start+=gridDim.x*blockDim.x){
+      //parallelize over nodes
+      if(x+start<*numCurrLevelNodes){
+          int my_node = currLevelNodes[x+start];
+          int my_neighbor_start = nodePtrs[my_node];
+          int my_neighbor_end = nodePtrs[my_node+1];
+          for(int c=my_neighbor_start;c<my_neighbor_end;c++){
+              int neighbor = nodeNeighbors[c];
+              // this node hasn't been visited
+              if(atomicCAS(nodeVisited+neighbor,0,1)==0){
+                  int my_index = atomicAdd(numNextLevelNodes,1);
+                  nextLevelNodes[my_index]=neighbor;
+              }
+          }
+      }
+  }
 }
 
 __global__ void gpu_block_queueing_kernel(unsigned int *nodePtrs,
@@ -53,6 +83,44 @@ __global__ void gpu_block_queueing_kernel(unsigned int *nodePtrs,
   // Allocate space for block queue to go into global queue
 
   // Store block queue in global queue
+    __shared__ int block_queue[BQ_CAPACITY];
+    __shared__ int bqueue_count;
+    __shared__ int start_fill_shared;
+    if (threadIdx.x == 0){
+        bqueue_count = 0;
+    }
+    int x =blockDim.x*blockIdx.x+threadIdx.x;  // x is per grid
+    for(int start = 0;start<*numCurrLevelNodes;start+=gridDim.x*blockDim.x){
+        //parallelize over nodes
+        if(x+start<*numCurrLevelNodes){
+            int my_node = currLevelNodes[x+start];
+            int my_neighbor_start = nodePtrs[my_node];
+            int my_neighbor_end = nodePtrs[my_node+1];
+            for(int c=my_neighbor_start;c<my_neighbor_end;c++) {
+                int neighbor = nodeNeighbors[c];
+                // this node hasn't been visited
+                if (atomicCAS(nodeVisited + neighbor, 0, 1) == 0) {
+                    int my_index = atomicAdd(&bqueue_count, 1);
+                    block_queue[my_index] = neighbor;
+                }
+            }
+        }
+        __syncthreads();
+        if((bqueue_count>2000 ||start+gridDim.x*blockDim.x>=*numCurrLevelNodes)) {
+            if (threadIdx.x == 0) {
+                start_fill_shared = atomicAdd(numNextLevelNodes, bqueue_count);
+            }
+            __syncthreads();
+            for (int fill = 0; fill < bqueue_count; fill += BLOCK_SIZE) {
+                nextLevelNodes[start_fill_shared + fill + threadIdx.x] = block_queue[fill + threadIdx.x];
+            }
+            __syncthreads();
+            if (threadIdx.x == 0) {
+                bqueue_count = 0;
+            }
+            __syncthreads();
+        }
+    }
 }
 
 __global__ void gpu_warp_queueing_kernel(unsigned int *nodePtrs,
